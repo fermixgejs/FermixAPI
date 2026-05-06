@@ -120,18 +120,6 @@ namespace FermixAPI
         [Description("Задержка после старта раунда перед спавном SCP-1344 (секунды).")]
         public float ScrambleSpawnDelay { get; set; } = 4f;
 
-        [Description("Стартовая «батарейка» SCP-1344 в секундах активного использования. Когда заряд = 0, очки автоматически выключаются. 0 = бесконечный заряд.")]
-        public float ScrambleBatteryMax { get; set; } = 60f;
-
-        [Description("Скорость восстановления заряда SCP-1344 в секунду, когда они выключены. 0 = заряд не восстанавливается сам.")]
-        public float ScrambleBatteryRecharge { get; set; } = 1.5f;
-
-        [Description("Бинд для toggle (вкл/выкл) SCP-1344 на лету. По умолчанию F (через FermixInput).")]
-        public bool ScrambleEnableHotkeyToggle { get; set; } = true;
-
-        [Description("Не давать SCP-1344 «выколоть глаза» (Blinded/Severed-Eyes-эффект) при снятии. true = безопасное снятие.")]
-        public bool ScrambleSafeUnequip { get; set; } = true;
-
         // ── FermixCallvote ──────────────────────────────────────────
 
         [Description("Включить голосования игроков (.cv kick/restart/ask + .vote yes/no).")]
