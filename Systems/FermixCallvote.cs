@@ -22,16 +22,28 @@ namespace FermixAPI.Systems
         private static CoroutineHandle _ticker;
         private static bool _initialized;
 
+        // Сохранённая ссылка на handler — иначе анонимный лямбда никогда
+        // не отписался бы (Action equality не работает на разных делегатах
+        // одной и той же лямбды), и при reload плагина мы тащили бы за
+        // собой висящие подписки.
+        private static Action<Exiled.Events.EventArgs.Server.RoundEndedEventArgs> _onRoundEnd;
+
         public static void Initialize()
         {
             if (_initialized || FermixCore.Config?.CallvoteEnabled != true) return;
-            FermixEvents.OnRoundEnd += _ => Cancel("раунд завершён");
+            _onRoundEnd = _ => Cancel("раунд завершён");
+            FermixEvents.OnRoundEnd += _onRoundEnd;
             _initialized = true;
         }
 
         public static void Shutdown()
         {
             if (!_initialized) return;
+            if (_onRoundEnd != null)
+            {
+                FermixEvents.OnRoundEnd -= _onRoundEnd;
+                _onRoundEnd = null;
+            }
             Cancel(null);
             _initialized = false;
         }

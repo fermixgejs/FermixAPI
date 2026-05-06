@@ -22,7 +22,7 @@ namespace FermixAPI.Core
 
         public const int VersionMajor = 2;
         public const int VersionMinor = 5;
-        public const int VersionPatch = 2;
+        public const int VersionPatch = 3;
         public const string VersionSuffix = "release";
 
         /// <summary>
