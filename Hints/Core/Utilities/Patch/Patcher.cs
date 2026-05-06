@@ -16,6 +16,14 @@ namespace FermixAPI.Hints.Core.Utilities.Patch
         public static Harmony? Harmony { get; private set; }
 
         /// <summary>
+        /// Уникальный ID для нашего Harmony-инстанса. Сохраняем его явно,
+        /// чтобы Unpatch() снимал ТОЛЬКО наши патчи (через
+        /// <see cref="HarmonyLib.Harmony.UnpatchAll(string)"/>), а не все патчи
+        /// всех плагинов сервера, как делает безпараметрический UnpatchAll().
+        /// </summary>
+        private static string? _harmonyId;
+
+        /// <summary>
         /// Applies all Harmony patches required by FermixAPI.Hints, including patches for hint display and hint sending methods.
         /// </summary>
         /// <remarks>
@@ -26,7 +34,8 @@ namespace FermixAPI.Hints.Core.Utilities.Patch
         /// </remarks>
         public static void Patch()
         {
-            Harmony = new Harmony("FermixAPI.HintsHarmony" + Guid.NewGuid());
+            _harmonyId = "FermixAPI.HintsHarmony." + Guid.NewGuid();
+            Harmony = new Harmony(_harmonyId);
 
             Type patchType = typeof(Patches);
 
@@ -59,11 +68,29 @@ namespace FermixAPI.Hints.Core.Utilities.Patch
         }
 
         /// <summary>
-        /// Removes all Harmony patches applied by this patcher.
+        /// Removes only Harmony patches applied by this patcher.
+        /// Use the harmonyID overload — иначе UnpatchAll() безпараметрически
+        /// сносит ВСЕ патчи (включая EXILED, LabAPI, прочих плагинов), что
+        /// было бы катастрофой при reload'е плагина.
         /// </summary>
         public static void Unpatch()
         {
-            Harmony?.UnpatchAll();
+            try
+            {
+                if (Harmony != null && !string.IsNullOrEmpty(_harmonyId))
+                {
+                    Harmony.UnpatchAll(_harmonyId);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Instance.Error($"FermixAPI.Hints: failed to unpatch Harmony id '{_harmonyId}': {ex.Message}");
+            }
+            finally
+            {
+                Harmony = null;
+                _harmonyId = null;
+            }
         }
 
         private static MethodInfo? ResolveMethod(Type owner, string name, params Type[] signature)
