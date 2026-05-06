@@ -56,6 +56,9 @@
                 if (!Plugin.Instance.Config.UseHintCompatibilityAdapter)
                     return false;
 
+                if (__instance == null || __instance.ReferenceHub == null)
+                    return false;
+
                 string assemblyName = Assembly.GetCallingAssembly().FullName;
                 __instance.GetPlayerDisplay().ShowCompatibilityHint(assemblyName, text, duration);
             }
@@ -73,6 +76,9 @@
             try
             {
                 if (!Plugin.Instance.Config.UseHintCompatibilityAdapter)
+                    return false;
+
+                if (__instance == null || __instance.ReferenceHub == null)
                     return false;
 
                 string assemblyName = Assembly.GetCallingAssembly().FullName;
@@ -95,6 +101,9 @@
                 if (!Plugin.Instance.Config.UseHintCompatibilityAdapter)
                     return false;
 
+                if (__instance == null || __instance.ReferenceHub == null)
+                    return false;
+
                 string assemblyName = Assembly.GetCallingAssembly().FullName;
                 __instance.GetPlayerDisplay().ShowCompatibilityHint(assemblyName, message, duration);
             }
@@ -114,7 +123,10 @@
                 if (!Plugin.Instance.Config.UseHintCompatibilityAdapter)
                     return false;
 
-                if (!hint.Show)
+                if (hint == null || !hint.Show)
+                    return false;
+
+                if (__instance == null || __instance.ReferenceHub == null)
                     return false;
 
                 string assemblyName = Assembly.GetCallingAssembly().FullName;

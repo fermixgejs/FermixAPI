@@ -22,7 +22,7 @@ namespace FermixAPI.Core
 
         public const int VersionMajor = 2;
         public const int VersionMinor = 5;
-        public const int VersionPatch = 3;
+        public const int VersionPatch = 4;
         public const string VersionSuffix = "release";
 
         /// <summary>
@@ -111,65 +111,67 @@ namespace FermixAPI.Core
 
             PluginInstance = plugin;
 
+            // Каждая подсистема инициализируется в своём try/catch, чтобы
+            // сбой одного модуля (например, при несовместимом обновлении
+            // SCP:SL/EXILED/LabAPI) не останавливал инициализацию остальных
+            // и не оставлял плагин в полузагруженном состоянии. Имя модуля
+            // выводится в лог — пользователю проще локализовать проблему.
+            SafeInit("FermixPaths",                () => FermixPaths.Initialize());
+            SafeInit("FermixConfigUtils",          () => Utils.FermixConfigUtils.Initialize());
+            SafeInit("FermixData",                 () => Utils.FermixData.Initialize());
+
+            SafeInit("WaitingForPlayers hook",     () => Handlers.Server.WaitingForPlayers += OnWaitingForPlayers);
+            SafeInit("Player.Left hook",           () => Handlers.Player.Left += OnPlayerLeft);
+
+            SafeInit("CheckDependencies",          CheckDependencies);
+            SafeInit("FermixEvents.Register",      FermixEvents.Register);
+            SafeInit("FermixScheduler",            FermixScheduler.Initialize);
+
+            SafeInit("FermixHintStack",            FermixHintStack.Initialize);
+            SafeInit("FermixInput",                Systems.FermixInput.Initialize);
+            SafeInit("FermixGlow",                 Systems.FermixGlow.Initialize);
+
+            SafeInit("FermixRemoteKeycard",        Systems.FermixRemoteKeycard.Initialize);
+            SafeInit("FermixChat",                 Systems.FermixChat.Initialize);
+            SafeInit("FermixGeneratorHud",         Systems.FermixGeneratorHud.Initialize);
+            SafeInit("FermixScramble",             Systems.FermixScramble.Initialize);
+            SafeInit("FermixCallvote",             Systems.FermixCallvote.Initialize);
+            SafeInit("FermixGoc",                  Systems.FermixGoc.Initialize);
+            SafeInit("FermixScp106Bindings",       Systems.FermixScp106Bindings.Initialize);
+
+            SafeInit("TpsCommand monitor",         Commands.TpsCommand.StartMonitor);
+            SafeInit("RoundStart hook",            () => FermixEvents.OnRoundStart += OnRoundStartedHook);
+
+            SafeInit("CoinManager",                CoinManager.Initialize);
+
+            IsInitialized = true;
+            FermixLog.Info($"Ядро FermixAPI v{Version} успешно инициализировано.");
+        }
+
+        private static void SafeInit(string moduleName, Action init)
+        {
             try
             {
-                // Создаём стандартную структуру каталогов FermixAPI
-                FermixPaths.Initialize();
-                Utils.FermixConfigUtils.Initialize();
-                Utils.FermixData.Initialize();
-
-                // Подписываемся на событие ожидания игроков для вывода логотипа
-                // и инициализации движка хинтов (FermixAPI.Hints).
-                Handlers.Server.WaitingForPlayers += OnWaitingForPlayers;
-
-                // На уход игрока — освобождаем его PlayerDisplay в hint-движке.
-                Handlers.Player.Left += OnPlayerLeft;
-
-                // Проверяем зависимости
-                CheckDependencies();
-
-                // Регистрируем события
-                FermixEvents.Register();
-
-                // Инициализируем планировщик задач
-                FermixScheduler.Initialize();
-
-                // Запускаем стек хинтов, SSS-биндинги и кастом-подсветку
-                FermixHintStack.Initialize();
-                Systems.FermixInput.Initialize();
-                Systems.FermixGlow.Initialize();
-
-                // Адаптации сторонних плагинов под нашу архитектуру
-                Systems.FermixRemoteKeycard.Initialize();
-                Systems.FermixChat.Initialize();
-                Systems.FermixGeneratorHud.Initialize();
-                Systems.FermixScramble.Initialize();
-                Systems.FermixCallvote.Initialize();
-                Systems.FermixGoc.Initialize();
-                Systems.FermixScp106Bindings.Initialize();
-
-                // Монитор TPS + сброс кулдауна воскрешения на старте раунда
-                Commands.TpsCommand.StartMonitor();
-                FermixEvents.OnRoundStart += OnRoundStartedHook;
-
-                // Инициализация встроенного модуля FermixCoin
-                CoinManager.Initialize();
-
-                IsInitialized = true;
-
-                FermixLog.Info($"Ядро FermixAPI v{Version} успешно инициализировано.");
+                init();
             }
             catch (Exception ex)
             {
-                // Не пробрасываем — иначе EXILED считает OnEnabled провалившимся,
-                // оставляет плагин в полузагруженном состоянии (часть подписок
-                // и Harmony-патчей уже стоит, остальное — нет), и серверу
-                // становится плохо вплоть до невозможности принять подключение.
-                // Лучше остаться в режиме «плагин частично активен» и
-                // продолжать работу сервера; пользователь увидит ошибку в
-                // логе и сможет диагностировать.
-                FermixLog.Error($"Критическая ошибка при инициализации ядра: {ex}");
-                IsInitialized = true;
+                // Не пробрасываем дальше — это сломает остальные модули.
+                // Логируем с именем модуля, чтобы пользователь сразу видел,
+                // какую подсистему отключить через config для диагностики.
+                FermixLog.Error($"Сбой инициализации модуля '{moduleName}': {ex}");
+            }
+        }
+
+        private static void SafeShutdown(string moduleName, Action shutdown)
+        {
+            try
+            {
+                shutdown();
+            }
+            catch (Exception ex)
+            {
+                FermixLog.Warn($"Сбой завершения модуля '{moduleName}': {ex.Message}");
             }
         }
 
@@ -180,66 +182,41 @@ namespace FermixAPI.Core
         {
             if (!IsInitialized) return;
 
-            try
+            SafeShutdown("WaitingForPlayers hook", () => Handlers.Server.WaitingForPlayers -= OnWaitingForPlayers);
+            SafeShutdown("Player.Left hook",       () => Handlers.Player.Left -= OnPlayerLeft);
+
+            SafeShutdown("Harmony unpatch", () =>
             {
-                // Отписываемся от событий сервера
-                Handlers.Server.WaitingForPlayers -= OnWaitingForPlayers;
-                Handlers.Player.Left -= OnPlayerLeft;
+                FermixAPI.Hints.Core.Utilities.Patch.Patcher.Unpatch();
+                IsHintEnginePatched = false;
+            });
 
-                // Снимаем все Harmony-патчи hint-движка, чтобы при reload'е
-                // плагина не остаться с битыми ссылками внутри Exiled.API.
-                try
-                {
-                    FermixAPI.Hints.Core.Utilities.Patch.Patcher.Unpatch();
-                    IsHintEnginePatched = false;
-                }
-                catch (Exception ex)
-                {
-                    FermixLog.Warn($"Не удалось снять патчи hint-движка: {ex.Message}");
-                }
+            SafeShutdown("StopAllCoroutines",      StopAllCoroutines);
+            SafeShutdown("FermixEvents.Unregister", FermixEvents.Unregister);
+            SafeShutdown("RoundStart hook",        () => FermixEvents.OnRoundStart -= OnRoundStartedHook);
+            SafeShutdown("TpsCommand monitor",     Commands.TpsCommand.StopMonitor);
 
-                // Останавливаем все корутины
-                StopAllCoroutines();
+            SafeShutdown("FermixScp106Bindings",   Systems.FermixScp106Bindings.Shutdown);
+            SafeShutdown("FermixGoc",              Systems.FermixGoc.Shutdown);
+            SafeShutdown("FermixCallvote",         Systems.FermixCallvote.Shutdown);
+            SafeShutdown("FermixScramble",         Systems.FermixScramble.Shutdown);
+            SafeShutdown("FermixGeneratorHud",     Systems.FermixGeneratorHud.Shutdown);
+            SafeShutdown("FermixChat",             Systems.FermixChat.Shutdown);
+            SafeShutdown("FermixRemoteKeycard",    Systems.FermixRemoteKeycard.Shutdown);
 
-                // Отписываемся от событий
-                FermixEvents.Unregister();
+            SafeShutdown("FermixGlow",             Systems.FermixGlow.Shutdown);
+            SafeShutdown("FermixInput",            Systems.FermixInput.Shutdown);
+            SafeShutdown("FermixHintStack",        FermixHintStack.Shutdown);
 
-                // Останавливаем стек хинтов, SSS-биндинги и подсветку
-                FermixEvents.OnRoundStart -= OnRoundStartedHook;
-                Commands.TpsCommand.StopMonitor();
+            SafeShutdown("LabApiCommands.Clear",   Integration.LabApiCommands.Clear);
+            SafeShutdown("LabApiEvents.ClearAll",  Integration.LabApiEvents.ClearAll);
 
-                // Адаптации сторонних плагинов
-                Systems.FermixScp106Bindings.Shutdown();
-                Systems.FermixGoc.Shutdown();
-                Systems.FermixCallvote.Shutdown();
-                Systems.FermixScramble.Shutdown();
-                Systems.FermixGeneratorHud.Shutdown();
-                Systems.FermixChat.Shutdown();
-                Systems.FermixRemoteKeycard.Shutdown();
+            SafeShutdown("CoinManager",            CoinManager.Shutdown);
+            SafeShutdown("FermixScheduler",        FermixScheduler.Shutdown);
 
-                Systems.FermixGlow.Shutdown();
-                Systems.FermixInput.Shutdown();
-                FermixHintStack.Shutdown();
-
-                // Очищаем LabAPI-регистрации
-                Integration.LabApiCommands.Clear();
-                Integration.LabApiEvents.ClearAll();
-
-                // Выключаем встроенный модуль FermixCoin
-                CoinManager.Shutdown();
-
-                // Останавливаем планировщик
-                FermixScheduler.Shutdown();
-
-                IsInitialized = false;
-                PluginInstance = null;
-
-                FermixLog.Info("FermixAPI успешно завершил работу.");
-            }
-            catch (Exception ex)
-            {
-                FermixLog.Error($"Ошибка при завершении работы: {ex}");
-            }
+            IsInitialized = false;
+            PluginInstance = null;
+            FermixLog.Info("FermixAPI успешно завершил работу.");
         }
 
         /// <summary>
