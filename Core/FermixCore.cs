@@ -22,7 +22,7 @@ namespace FermixAPI.Core
 
         public const int VersionMajor = 2;
         public const int VersionMinor = 5;
-        public const int VersionPatch = 1;
+        public const int VersionPatch = 2;
         public const string VersionSuffix = "release";
 
         /// <summary>
@@ -161,8 +161,15 @@ namespace FermixAPI.Core
             }
             catch (Exception ex)
             {
+                // Не пробрасываем — иначе EXILED считает OnEnabled провалившимся,
+                // оставляет плагин в полузагруженном состоянии (часть подписок
+                // и Harmony-патчей уже стоит, остальное — нет), и серверу
+                // становится плохо вплоть до невозможности принять подключение.
+                // Лучше остаться в режиме «плагин частично активен» и
+                // продолжать работу сервера; пользователь увидит ошибку в
+                // логе и сможет диагностировать.
                 FermixLog.Error($"Критическая ошибка при инициализации ядра: {ex}");
-                throw;
+                IsInitialized = true;
             }
         }
 
