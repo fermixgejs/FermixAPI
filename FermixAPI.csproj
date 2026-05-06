@@ -1,0 +1,154 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>FermixAPI</AssemblyName>
+    <RootNamespace>FermixAPI</RootNamespace>
+    <Version>2.5.2</Version>
+    <Authors>Fermix</Authors>
+    <Description>Advanced API for Exiled (9.13.x) with LabAPI (1.1.x) integration</Description>
+    <NoWarn>CS1591;CS1573;CS0618;CS8632;CS1998</NoWarn>
+    <!-- Hints/ source originated from HintServiceMeow (MIT) and uses #if EXILED -->
+    <DefineConstants>$(DefineConstants);EXILED</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+    FermixAPI references the SCP:SL game and the EXILED / LabAPI plugin frameworks.
+    The DLLs are expected to be available either:
+      - In a folder pointed at by the FERMIX_REFERENCES MSBuild property /
+        environment variable (preferred for local development), or
+      - In the build output of the previous FermixAPI build that ships with
+        the repository under refs/.
+    The default below points to ../../refs (the location used by the
+    Devin / CI build pipeline). Override with -p:FERMIX_REFERENCES=... when
+    building locally.
+  -->
+  <PropertyGroup>
+    <FERMIX_REFERENCES Condition="'$(FERMIX_REFERENCES)' == ''">$(MSBuildThisFileDirectory)refs</FERMIX_REFERENCES>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- SCP:SL game assemblies -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(FERMIX_REFERENCES)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>$(FERMIX_REFERENCES)\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="CommandSystem.Core">
+      <HintPath>$(FERMIX_REFERENCES)\CommandSystem.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Mirror">
+      <HintPath>$(FERMIX_REFERENCES)\Mirror.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="PluginAPI">
+      <HintPath>$(FERMIX_REFERENCES)\PluginAPI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NorthwoodLib">
+      <HintPath>$(FERMIX_REFERENCES)\NorthwoodLib.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Pooling">
+      <HintPath>$(FERMIX_REFERENCES)\Pooling.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Unity assemblies -->
+    <Reference Include="UnityEngine">
+      <HintPath>$(FERMIX_REFERENCES)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(FERMIX_REFERENCES)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(FERMIX_REFERENCES)\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- EXILED 9.13.x -->
+    <Reference Include="Exiled.API">
+      <HintPath>$(FERMIX_REFERENCES)\Exiled.API.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Exiled.Events">
+      <HintPath>$(FERMIX_REFERENCES)\Exiled.Events.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Exiled.Loader">
+      <HintPath>$(FERMIX_REFERENCES)\Exiled.Loader.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SemanticVersioning">
+      <HintPath>$(FERMIX_REFERENCES)\SemanticVersioning.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- LabAPI 1.1.x -->
+    <Reference Include="LabApi">
+      <HintPath>$(FERMIX_REFERENCES)\LabApi.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Lib.Harmony — нужен для движка хинтов (Hints/), который патчит
+         нативный pipeline ShowHint / SendHint, чтобы кооперативно делить
+         экран с другими плагинами. EXILED грузит 0Harmony.dll сам. -->
+    <Reference Include="0Harmony">
+      <HintPath>$(FERMIX_REFERENCES)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- System.IO.Compression — нужен для распаковки TextWidth-таблицы
+         в Hints/Core/Utilities/Tools/FontTool.cs. Не входит в стандартный
+         net48 GAC по умолчанию. -->
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" Version="13.7.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!-- Hints/TextWidth — таблица ширин символов TextMeshPro, нужна движку
+       хинтов для точного позиционирования. Грузится через
+       Assembly.GetManifestResourceStream("FermixAPI.Hints.TextWidth"). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Hints\TextWidth">
+      <LogicalName>FermixAPI.Hints.TextWidth</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- examples/ — справочные сэмплы для пользователей API; не часть FermixAPI.dll -->
+  <ItemGroup>
+    <Compile Remove="examples/**" />
+    <None Include="examples/**/*.cs" />
+    <None Include="examples/**/*.md" />
+  </ItemGroup>
+
+  <!-- vendor/ — копия исходников EXILED 9.13.3 и LabAPI 1.1.6 для справки;
+       не входит в сборку. Компилятор использует DLL из refs/. -->
+  <ItemGroup>
+    <Compile Remove="vendor/**" />
+    <EmbeddedResource Remove="vendor/**" />
+    <None Remove="vendor/**" />
+  </ItemGroup>
+
+  <!-- plugins/ — отдельные плагины-потребители FermixAPI (например FermixCoin).
+       Каждый имеет собственный .csproj и собирается независимой командой. -->
+  <ItemGroup>
+    <Compile Remove="plugins/**" />
+    <EmbeddedResource Remove="plugins/**" />
+    <None Remove="plugins/**" />
+  </ItemGroup>
+
+</Project>

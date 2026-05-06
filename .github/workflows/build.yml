@@ -1,0 +1,119 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache SCP:SL Dedicated Server
+        id: cache-scpsl
+        uses: actions/cache@v4
+        with:
+          path: ~/scpsl_server/SCPSL_Data/Managed
+          key: scpsl-server-managed-${{ runner.os }}-v4
+
+      - name: Setup SteamCMD
+        if: steps.cache-scpsl.outputs.cache-hit != 'true'
+        uses: CyberAndrii/setup-steamcmd@v1
+
+      - name: Download SCP:SL Dedicated Server (app 996560)
+        if: steps.cache-scpsl.outputs.cache-hit != 'true'
+        run: |
+          # Retry a few times — Steam sometimes returns "Missing configuration"
+          # on the first run with a fresh steamcmd install.
+          attempt=0
+          until steamcmd \
+              +force_install_dir "$HOME/scpsl_server" \
+              +login anonymous \
+              +app_update 996560 validate \
+              +quit; do
+            attempt=$((attempt + 1))
+            if [ "$attempt" -ge 4 ]; then
+              echo "steamcmd failed after $attempt attempts" >&2
+              exit 1
+            fi
+            echo "steamcmd attempt $attempt failed; cleaning appmanifest and retrying..."
+            rm -f "$HOME/scpsl_server/steamapps/appmanifest_996560.acf" || true
+            sleep 5
+          done
+
+      - name: Fetch EXILED + LabAPI references
+        run: bash scripts/fetch-references.sh
+
+      - name: Copy SCP:SL game DLLs into refs/
+        run: |
+          mkdir -p refs
+          cp "$HOME/scpsl_server/SCPSL_Data/Managed/"*.dll refs/
+          ls -1 refs/ | head -40
+
+      - name: Restore + Build (FermixAPI)
+        run: dotnet build FermixAPI.csproj -c Release
+
+      - name: Upload build artifact (FermixAPI)
+        uses: actions/upload-artifact@v4
+        with:
+          name: FermixAPI
+          path: |
+            bin/Release/net48/FermixAPI.dll
+            bin/Release/net48/FermixAPI.pdb
+
+      - name: Package release zip
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          STAGE="artifact/FermixAPI"
+          mkdir -p "$STAGE"
+          cp bin/Release/net48/FermixAPI.dll "$STAGE/"
+          cp bin/Release/net48/FermixAPI.pdb "$STAGE/"
+          cp README.md "$STAGE/"
+          [ -d examples ] && cp -r examples "$STAGE/"
+          (cd artifact && zip -r "../FermixAPI-${VERSION}.zip" FermixAPI)
+          ls -lh "FermixAPI-${VERSION}.zip"
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bin/Release/net48/FermixAPI.dll
+            bin/Release/net48/FermixAPI.pdb
+            FermixAPI-${{ github.ref_name }}.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          body: |
+            # FermixAPI ${{ github.ref_name }}
+
+            ## Установка
+            1. Скачай **`FermixAPI.dll`** ниже (в Assets).
+            2. Положи в `EXILED/Plugins/`.
+            3. Перезапусти сервер.
+
+            ## Совместимость
+            - EXILED **9.13.3**
+            - LabAPI **1.1.6**
+            - .NET Framework **4.8**
+
+            ## Что нового
+            См. ниже автогенерированный список коммитов.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

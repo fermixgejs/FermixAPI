@@ -1,0 +1,28 @@
+# Build output
+bin/
+obj/
+*.user
+*.suo
+*.cache
+
+# Visual Studio
+.vs/
+*.userprefs
+.vscode/
+
+# Rider
+.idea/
+
+# Reference DLLs (downloaded by build script — do not commit)
+refs/
+*.dll
+*.pdb
+*.mdb
+
+# NuGet
+packages/
+*.nupkg
+
+# OS
+.DS_Store
+Thumbs.db
