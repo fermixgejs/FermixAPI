@@ -37,8 +37,13 @@ namespace FermixAPI.Systems
             FermixEvents.OnPlayerJoin += OnPlayerJoined;
             FermixEvents.OnPlayerLeave += OnPlayerLeft;
 
-            foreach (Player p in Player.List)
-                AttachHint(p);
+            // ВАЖНО: НЕ привязываем chat-хинт к уже подключённым игрокам прямо
+            // здесь. Initialize вызывается из FermixCore при включении плагина,
+            // когда живых игроков обычно ещё нет. Но если плагин перезагружают
+            // на лету (reload), мы могли бы триггернуть создание PlayerDisplay
+            // на полузапущенном Mirror'овском NetworkConnection и сломать
+            // network pipeline. Хинты доцепятся при первом Player.Joined +
+            // через FermixScheduler.Delay (см. OnPlayerJoined ниже).
 
             _initialized = true;
         }
@@ -142,7 +147,39 @@ namespace FermixAPI.Systems
         private static void OnPlayerJoined(JoinedEventArgs ev)
         {
             if (ev?.Player == null) return;
-            AttachHint(ev.Player);
+
+            // КРИТИЧНО: ДО версии 2.5.5 здесь сразу шёл AttachHint(ev.Player),
+            // и это ломало подключение игрокам. Дело в том, что
+            // Handlers.Player.Joined в EXILED 9.13.3 фаерится ПО ХОДУ
+            // инициализации player'а (Mirror всё ещё досоздаёт NetworkBehaviour'ы
+            // на GameObject игрока). Создание PlayerDisplay в Hints-движке
+            // запускает фоновый PeriodicRunner (Task.Run), который начинает
+            // диспатчить hint-сообщения через connectionToClient.Send из
+            // ThreadPool-треда. Mirror NetworkConnection.Send НЕ thread-safe,
+            // и параллельный Send во время инициализации связи с клиентом
+            // приводит к рассинхронизации NetworkBehaviour'ов: в частности,
+            // RemoteAdmin.QueryProcessor.Start() не успевает доустановить
+            // _playerId, после чего Mirror сносит игрока, и
+            // QueryProcessor.OnDestroy падает с NRE при попытке удалить
+            // null-ключ из ConcurrentDictionary. Игрока выкидывает с
+            // пустым ником через ~6 секунд после preauth.
+            //
+            // Фикс: откладываем AttachHint на 5 секунд через FermixScheduler.
+            // К этому моменту Mirror гарантированно достроит player и можно
+            // безопасно создавать PlayerDisplay + начинать слать хинты.
+            var player = ev.Player;
+            FermixScheduler.Delay(5f, () =>
+            {
+                try
+                {
+                    if (player == null || !player.IsConnected) return;
+                    AttachHint(player);
+                }
+                catch (Exception ex)
+                {
+                    FermixLog.Warn($"FermixChat: deferred AttachHint failed for {player?.Nickname}: {ex.Message}");
+                }
+            });
         }
 
         private static void OnPlayerLeft(LeftEventArgs ev)
