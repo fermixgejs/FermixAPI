@@ -14,6 +14,12 @@ namespace FermixAPI
         [Description("Режим отладки - выводит дополнительную информацию в консоль")]
         public bool Debug { get; set; } = false;
 
+        [Description("Применять Harmony-патчи hint-движка (HintDisplay.Show, Player.ShowHint). Установи false для диагностики проблем подключения игроков, если есть подозрение на конфликт с игрой/другим плагином. При false наш hint-стек работать не будет, но базовые player.ShowHint от EXILED/LabAPI продолжат идти по родному пути игры.")]
+        public bool EnableHintEnginePatches { get; set; } = true;
+
+        [Description("САВНЫЙ РЕЖИМ: отключает ВСЕ подсистемы (Coin/Glow/Chat/Goc/...) и Harmony-патчи. Загружает только ядро + EXILED-привязки. Используй для A/B-теста, если игроки не могут зайти на сервер с FermixAPI.")]
+        public bool SafeMode { get; set; } = false;
+
         [Description("Показывать ASCII-логотип при запуске")]
         public bool ShowLogo { get; set; } = true;
 
