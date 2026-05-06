@@ -22,7 +22,7 @@ namespace FermixAPI.Core
 
         public const int VersionMajor = 2;
         public const int VersionMinor = 5;
-        public const int VersionPatch = 4;
+        public const int VersionPatch = 5;
         public const string VersionSuffix = "release";
 
         /// <summary>
@@ -111,6 +111,15 @@ namespace FermixAPI.Core
 
             PluginInstance = plugin;
 
+            // SafeMode=true — поднимаем только минимум: пути, конфиг, базовые
+            // EXILED-хуки и FermixEvents. Никаких подсистем, никаких Harmony-
+            // патчей. Используется для A/B-теста, если игроки не могут зайти
+            // на сервер с FermixAPI: в этом режиме плагин загружен, но не
+            // вмешивается в gameplay.
+            bool safeMode = Config?.SafeMode == true;
+            if (safeMode)
+                FermixLog.Warn("SafeMode=true — все подсистемы FermixAPI и Harmony-патчи отключены. Сброс через config.");
+
             // Каждая подсистема инициализируется в своём try/catch, чтобы
             // сбой одного модуля (например, при несовместимом обновлении
             // SCP:SL/EXILED/LabAPI) не останавливал инициализацию остальных
@@ -127,25 +136,28 @@ namespace FermixAPI.Core
             SafeInit("FermixEvents.Register",      FermixEvents.Register);
             SafeInit("FermixScheduler",            FermixScheduler.Initialize);
 
-            SafeInit("FermixHintStack",            FermixHintStack.Initialize);
-            SafeInit("FermixInput",                Systems.FermixInput.Initialize);
-            SafeInit("FermixGlow",                 Systems.FermixGlow.Initialize);
+            if (!safeMode)
+            {
+                SafeInit("FermixHintStack",            FermixHintStack.Initialize);
+                SafeInit("FermixInput",                Systems.FermixInput.Initialize);
+                SafeInit("FermixGlow",                 Systems.FermixGlow.Initialize);
 
-            SafeInit("FermixRemoteKeycard",        Systems.FermixRemoteKeycard.Initialize);
-            SafeInit("FermixChat",                 Systems.FermixChat.Initialize);
-            SafeInit("FermixGeneratorHud",         Systems.FermixGeneratorHud.Initialize);
-            SafeInit("FermixScramble",             Systems.FermixScramble.Initialize);
-            SafeInit("FermixCallvote",             Systems.FermixCallvote.Initialize);
-            SafeInit("FermixGoc",                  Systems.FermixGoc.Initialize);
-            SafeInit("FermixScp106Bindings",       Systems.FermixScp106Bindings.Initialize);
+                SafeInit("FermixRemoteKeycard",        Systems.FermixRemoteKeycard.Initialize);
+                SafeInit("FermixChat",                 Systems.FermixChat.Initialize);
+                SafeInit("FermixGeneratorHud",         Systems.FermixGeneratorHud.Initialize);
+                SafeInit("FermixScramble",             Systems.FermixScramble.Initialize);
+                SafeInit("FermixCallvote",             Systems.FermixCallvote.Initialize);
+                SafeInit("FermixGoc",                  Systems.FermixGoc.Initialize);
+                SafeInit("FermixScp106Bindings",       Systems.FermixScp106Bindings.Initialize);
 
-            SafeInit("TpsCommand monitor",         Commands.TpsCommand.StartMonitor);
-            SafeInit("RoundStart hook",            () => FermixEvents.OnRoundStart += OnRoundStartedHook);
+                SafeInit("TpsCommand monitor",         Commands.TpsCommand.StartMonitor);
+                SafeInit("RoundStart hook",            () => FermixEvents.OnRoundStart += OnRoundStartedHook);
 
-            SafeInit("CoinManager",                CoinManager.Initialize);
+                SafeInit("CoinManager",                CoinManager.Initialize);
+            }
 
             IsInitialized = true;
-            FermixLog.Info($"Ядро FermixAPI v{Version} успешно инициализировано.");
+            FermixLog.Info($"Ядро FermixAPI v{Version} успешно инициализировано{(safeMode ? " (SafeMode)" : "")}.");
         }
 
         private static void SafeInit(string moduleName, Action init)
@@ -264,14 +276,28 @@ namespace FermixAPI.Core
             // player.ShowHint в раунде, иначе мы пропустим первые хинты
             // (стартовые spawn-сообщения и т.п.). WaitingForPlayers — самое
             // раннее серверное событие, на котором всё уже инициализировано.
-            try
+            //
+            // SafeMode / EnableHintEnginePatches=false — патчи не применяем
+            // вообще, hint-стек работать не будет, но базовый player.ShowHint
+            // продолжит идти по родному пути игры. Используется для
+            // диагностики: иногда наш Harmony-патч может конфликтовать с
+            // другим плагином, и игроков не пускает на сервер.
+            bool patchesEnabled = Config?.SafeMode != true && Config?.EnableHintEnginePatches != false;
+            if (!patchesEnabled)
             {
-                FermixAPI.Hints.Core.Utilities.Patch.Patcher.Patch();
-                IsHintEnginePatched = true;
+                FermixLog.Warn("Harmony-патчи hint-движка пропущены (SafeMode=true или EnableHintEnginePatches=false).");
             }
-            catch (Exception ex)
+            else
             {
-                FermixLog.Error($"Не удалось применить Harmony-патчи hint-движка: {ex}");
+                try
+                {
+                    FermixAPI.Hints.Core.Utilities.Patch.Patcher.Patch();
+                    IsHintEnginePatched = true;
+                }
+                catch (Exception ex)
+                {
+                    FermixLog.Error($"Не удалось применить Harmony-патчи hint-движка: {ex}");
+                }
             }
 
             if (Config?.ShowLogo == true)
