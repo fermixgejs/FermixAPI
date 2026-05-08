@@ -21,9 +21,9 @@ namespace FermixAPI.Core
         #region Version Info
 
         public const int VersionMajor = 2;
-        public const int VersionMinor = 5;
-        public const int VersionPatch = 6;
-        public const string VersionSuffix = "release";
+        public const int VersionMinor = 6;
+        public const int VersionPatch = 5;
+        public const string VersionSuffix = "release+serverhud";
 
         /// <summary>
         /// Минимальная требуемая версия EXILED.
@@ -128,6 +128,7 @@ namespace FermixAPI.Core
             SafeInit("FermixPaths",                () => FermixPaths.Initialize());
             SafeInit("FermixConfigUtils",          () => Utils.FermixConfigUtils.Initialize());
             SafeInit("FermixData",                 () => Utils.FermixData.Initialize());
+            SafeInit("FermixConfigSplit",          Systems.FermixConfigSplit.Initialize);
 
             SafeInit("WaitingForPlayers hook",     () => Handlers.Server.WaitingForPlayers += OnWaitingForPlayers);
             SafeInit("Player.Left hook",           () => Handlers.Player.Left += OnPlayerLeft);
@@ -146,9 +147,22 @@ namespace FermixAPI.Core
                 SafeInit("FermixChat",                 Systems.FermixChat.Initialize);
                 SafeInit("FermixGeneratorHud",         Systems.FermixGeneratorHud.Initialize);
                 SafeInit("FermixScramble",             Systems.FermixScramble.Initialize);
+                SafeInit("FermixNvg",                  Systems.FermixNvg.Initialize);
+                SafeInit("FermixCustomItemHints",      Systems.FermixCustomItemHints.Initialize);
                 SafeInit("FermixCallvote",             Systems.FermixCallvote.Initialize);
                 SafeInit("FermixGoc",                  Systems.FermixGoc.Initialize);
+                SafeInit("FermixSquadClasses",         Systems.FermixSquadClasses.Initialize);
                 SafeInit("FermixScp106Bindings",       Systems.FermixScp106Bindings.Initialize);
+
+                SafeInit("FermixInfinity",             Systems.FermixInfinity.Initialize);
+                SafeInit("FermixHitmarkers",           Systems.FermixHitmarkers.Initialize);
+                SafeInit("FermixPlayerXp",             Systems.FermixPlayerXp.Initialize);
+                SafeInit("FermixScpSwap",              Systems.FermixScpSwap.Initialize);
+                SafeInit("FermixTeleportRegistry",     Systems.FermixTeleportRegistry.Initialize);
+                // FermixServerHud стартует ПОСЛЕ FermixPlayerXp, потому что
+                // он опционально зовёт FermixPlayerXp.GetLevel() при отрисовке
+                // карточки игрока.
+                SafeInit("FermixServerHud",            Systems.FermixServerHud.Initialize);
 
                 SafeInit("TpsCommand monitor",         Commands.TpsCommand.StartMonitor);
                 SafeInit("RoundStart hook",            () => FermixEvents.OnRoundStart += OnRoundStartedHook);
@@ -208,9 +222,18 @@ namespace FermixAPI.Core
             SafeShutdown("RoundStart hook",        () => FermixEvents.OnRoundStart -= OnRoundStartedHook);
             SafeShutdown("TpsCommand monitor",     Commands.TpsCommand.StopMonitor);
 
+            SafeShutdown("FermixServerHud",        Systems.FermixServerHud.Shutdown);
+            SafeShutdown("FermixTeleportRegistry", Systems.FermixTeleportRegistry.Shutdown);
+            SafeShutdown("FermixScpSwap",          Systems.FermixScpSwap.Shutdown);
+            SafeShutdown("FermixPlayerXp",         Systems.FermixPlayerXp.Shutdown);
+            SafeShutdown("FermixHitmarkers",       Systems.FermixHitmarkers.Shutdown);
+            SafeShutdown("FermixInfinity",         Systems.FermixInfinity.Shutdown);
+
             SafeShutdown("FermixScp106Bindings",   Systems.FermixScp106Bindings.Shutdown);
+            SafeShutdown("FermixSquadClasses",     Systems.FermixSquadClasses.Shutdown);
             SafeShutdown("FermixGoc",              Systems.FermixGoc.Shutdown);
             SafeShutdown("FermixCallvote",         Systems.FermixCallvote.Shutdown);
+            SafeShutdown("FermixNvg",              Systems.FermixNvg.Shutdown);
             SafeShutdown("FermixScramble",         Systems.FermixScramble.Shutdown);
             SafeShutdown("FermixGeneratorHud",     Systems.FermixGeneratorHud.Shutdown);
             SafeShutdown("FermixChat",             Systems.FermixChat.Shutdown);
