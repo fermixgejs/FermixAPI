@@ -23,7 +23,7 @@ namespace FermixAPI.Core
         public const int VersionMajor = 2;
         public const int VersionMinor = 6;
         public const int VersionPatch = 5;
-        public const string VersionSuffix = "release";
+        public const string VersionSuffix = "release+serverhud";
 
         /// <summary>
         /// Минимальная требуемая версия EXILED.
@@ -159,6 +159,10 @@ namespace FermixAPI.Core
                 SafeInit("FermixPlayerXp",             Systems.FermixPlayerXp.Initialize);
                 SafeInit("FermixScpSwap",              Systems.FermixScpSwap.Initialize);
                 SafeInit("FermixTeleportRegistry",     Systems.FermixTeleportRegistry.Initialize);
+                // FermixServerHud стартует ПОСЛЕ FermixPlayerXp, потому что
+                // он опционально зовёт FermixPlayerXp.GetLevel() при отрисовке
+                // карточки игрока.
+                SafeInit("FermixServerHud",            Systems.FermixServerHud.Initialize);
 
                 SafeInit("TpsCommand monitor",         Commands.TpsCommand.StartMonitor);
                 SafeInit("RoundStart hook",            () => FermixEvents.OnRoundStart += OnRoundStartedHook);
@@ -218,6 +222,7 @@ namespace FermixAPI.Core
             SafeShutdown("RoundStart hook",        () => FermixEvents.OnRoundStart -= OnRoundStartedHook);
             SafeShutdown("TpsCommand monitor",     Commands.TpsCommand.StopMonitor);
 
+            SafeShutdown("FermixServerHud",        Systems.FermixServerHud.Shutdown);
             SafeShutdown("FermixTeleportRegistry", Systems.FermixTeleportRegistry.Shutdown);
             SafeShutdown("FermixScpSwap",          Systems.FermixScpSwap.Shutdown);
             SafeShutdown("FermixPlayerXp",         Systems.FermixPlayerXp.Shutdown);

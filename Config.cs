@@ -246,5 +246,48 @@ namespace FermixAPI
         [Description("Окно (в секундах) с начала раунда, в течение которого можно использовать .swap. По умолчанию 90с — как в Hazbin.")]
         public float ScpSwapWindowSeconds { get; set; } = 90f;
 
+        // ── FermixServerHud (главный HUD сервера) ───────────────────
+        //
+        // Серверный HUD: «шапка» с названием сервера, индикатор раунда/TPS,
+        // карточка игрока (ник/роль/уровень), список живых SCP с их HP,
+        // индикатор SCP-чата при разговоре, и таймер ближайшей волны со
+        // случайной подсказкой для зрителей. Портировано из Hazbin.NoRules.Hud
+        // под архитектуру FermixAPI: каждая надпись — отдельный HsmHint в
+        // выделенной группе PlayerDisplay (FermixAPI.ServerHud), чтобы не
+        // конфликтовать с центральным FermixHintStack.
+
+        [Description("Включить серверный HUD (название сервера + статус игрока + волны/SCP).")]
+        public bool ServerHudEnabled { get; set; } = true;
+
+        [Description("Название сервера в шапке HUD'а. Поддерживает rich-text (<color=...>, <b>, <i>, <size=...>). По умолчанию — градиент NezerHill NoRules.")]
+        public string ServerHudServerName { get; set; } =
+            "<color=#FF3B3B>N</color><color=#FA4135>e</color><color=#F5472F>z</color><color=#F04C29>e</color>" +
+            "<color=#EB5223>r</color><color=#E6571D>H</color><color=#E15D17>i</color><color=#DC6311>l</color><color=#D7680B>l</color>" +
+            " <size=22><color=#FF8C00>NoRules</color></size>";
+
+        [Description("Как часто (секунды) меняется случайная подсказка в окне ожидания волны для зрителей.")]
+        public float ServerHudInfoRotationInterval { get; set; } = 8f;
+
+        [Description("Показывать в карточке игрока его уровень из FermixPlayerXp (если PlayerXpEnabled=false — будет писать «Неизвестно»).")]
+        public bool ServerHudShowPlayerLevel { get; set; } = true;
+
+        [Description("Показывать список живых SCP и их текущий HP на правой стороне экрана.")]
+        public bool ServerHudShowScpHpList { get; set; } = true;
+
+        [Description("Показывать ли таймер ближайшей волны мертвым/зрителям (МОГ + Хаос + подкрепления). При false таймер скрыт.")]
+        public bool ServerHudShowWaveTimers { get; set; } = true;
+
+        [Description("Список случайных подсказок для зрителей — выводится по очереди раз в ServerHudInfoRotationInterval секунд под таймером волн.")]
+        public System.Collections.Generic.List<string> ServerHudSpectatorInfo { get; set; } =
+            new System.Collections.Generic.List<string>
+            {
+                "Добро пожаловать на NezerHill NoRules!",
+                "В нашем дискорде проходит набор в администрацию!",
+                "Используй .help в консоли для списка команд.",
+                "Подкинь монетку (.coin) — может выпасть оружие или эффект.",
+                "Команда .vote yes/no — голосование от админов через .cv.",
+                "Если зашёл за SCP — у каждого свой набор уникальных биндов.",
+                "Суицид не выход!",
+            };
     }
 }
