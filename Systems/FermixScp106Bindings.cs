@@ -14,17 +14,17 @@ namespace FermixAPI.Systems
 {
     /// <summary>
     /// SSS-биндинги SCP-106 («усиленный 106»):
-    /// • <b>F</b> — телепорт через портал к ближайшему живому человеку, дистанция ≤ 100 м;
-    /// • <b>V</b> — toggle Stalk-режим.
+    /// • <b>F</b> — телепорт через портал к ближайшему живому человеку, дистанция ≤ 100 м.
     ///
-    /// Ранее использовался default-Q бинд для Stalk, но Q зарезервирован игрой
-    /// под voicechat (talk), поэтому тут зарегистрированы СОБСТВЕННЫЕ
-    /// SSS keybind'ы с пометкой [SCP-106] в названии — они появляются у
-    /// игрока в меню Server Specific Settings и не пересекаются с обычными
-    /// биндами FermixInput. Срабатывают только если игрок реально SCP-106.
+    /// Stalk-режим вырезан полностью: отдельного бинда и субкоманды
+    /// больше нет — оставлена только ванильная игровая механика.
     ///
-    /// При спавне за SCP-106 игроку шлётся персональный broadcast о том, что
-    /// он играет за «усиленную» версию + памятка по биндам.
+    /// SSS keybind'ы с пометкой [SCP-106] в названии появляются у игрока в меню
+    /// Server Specific Settings и не пересекаются с обычными биндами
+    /// FermixInput. Срабатывает только если игрок реально SCP-106.
+    ///
+    /// При спавне за SCP-106 игроку шлётся расширенный инфо-хинт (на ~37 сек),
+    /// чтобы объяснить особенности роли и бинд.
     /// </summary>
     public static class FermixScp106Bindings
     {
@@ -32,7 +32,6 @@ namespace FermixAPI.Systems
         // дефолтами (300-306), ни с пользовательскими (307+).
         private const int Scp106HeaderId = 308;
         private const int Scp106PortalKeyId = 320;
-        private const int Scp106StalkKeyId = 321;
 
         // Радиус поиска цели для F-телепорта (запрос пользователя).
         private const float TeleportMaxRangeMeters = 100f;
@@ -69,13 +68,7 @@ namespace FermixAPI.Systems
                     header,
                     "Открыть портал к ближайшему живому игроку-человеку в радиусе 100 метров."));
 
-                _ownSettings.Add(MakeKeybind(
-                    Scp106StalkKeyId,
-                    "[SCP-106] Stalk (вкл/выкл)",
-                    KeyCode.V,
-                    header,
-                    "Переключить режим преследования (Stalk). Q зарезервирован игрой под голосовой чат."));
-
+                FermixInput.DropExistingByIds(new[] { Scp106HeaderId, Scp106PortalKeyId });
                 SettingBase.Register(_ownSettings);
             }
             catch (Exception ex)
@@ -145,7 +138,6 @@ namespace FermixAPI.Systems
             if (kb.IsPressed)
             {
                 if (kb.Id == Scp106PortalKeyId) OnPortalKey(player);
-                else if (kb.Id == Scp106StalkKeyId) OnStalkKey(player);
             }
         }
 
@@ -158,12 +150,6 @@ namespace FermixAPI.Systems
                 return false;
             _lastUse[id] = DateTime.UtcNow;
             return true;
-        }
-
-        private static void OnStalkKey(Player p)
-        {
-            if (!Allowed(p)) return;
-            FermixScp106Plus.TryToggleStalk(p, out _);
         }
 
         private static void OnPortalKey(Player p)
@@ -248,12 +234,16 @@ namespace FermixAPI.Systems
 
                     FermixHint.SendColored(
                         player,
-                        "<b>Ты — УСИЛЕННЫЙ SCP-106.</b>\n" +
-                        "• <color=#ff8b8b>F</color> — портал к ближайшему врагу (≤100м)\n" +
-                        "• <color=#ff8b8b>V</color> — Stalk-режим (вкл/выкл)\n" +
+                        "<b>Ты — УСИЛЕННЫЙ SCP-106.</b>\n\n" +
+                        "Основные возможности этой версии:\n" +
+                        "• <color=#ff8b8b>F</color> — открыть портал к ближайшему живому врагу (радиус ≤100м).\n" +
+                        "  Портал тратит Vigor — используй, когда жертва уже ослаблена.\n" +
+                        "• <color=#ff8b8b>.106 tp &lt;комната&gt;</color> — портал в конкретную комнату.\n\n" +
+                        "<color=#ffd24a>Подсказка:</color> отдельного Stalk-бинда больше нет —\n" +
+                        "работает только ванильная игровая механика SCP-106.\n\n" +
                         "<size=80%><color=#aaaaaa>Биндинги настраиваются в Server Specific Settings.</color></size>",
                         FermixHint.Magenta,
-                        7f);
+                        37f);
                 }
                 catch (Exception ex)
                 {
