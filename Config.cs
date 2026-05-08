@@ -120,6 +120,12 @@ namespace FermixAPI
         [Description("Задержка после старта раунда перед спавном SCP-1344 (секунды).")]
         public float ScrambleSpawnDelay { get; set; } = 4f;
 
+        [Description("Длительность активной фазы SCRAMBLE (секунды). После этого автодеактивация и кулдаун.")]
+        public float ScrambleActiveDuration { get; set; } = 30f;
+
+        [Description("Кулдаун после деактивации SCRAMBLE до следующей активации (секунды). По умолчанию 120с (2 минуты).")]
+        public float ScrambleCooldown { get; set; } = 120f;
+
         // ── FermixCallvote ──────────────────────────────────────────
 
         [Description("Включить голосования игроков (.cv kick/restart/ask + .vote yes/no).")]
@@ -147,7 +153,141 @@ namespace FermixAPI
         [Description("Включить G.O.C. — отдельный отряд, враждебный всем (MTF, Chaos, SCP).")]
         public bool GocEnabled { get; set; } = true;
 
-        [Description("Шанс (0..1) того, что прибывшая волна MTF превратится в G.O.C.")]
-        public float GocWaveChance { get; set; } = 0.1f;
+        [Description("С какой минуты раунда может начаться волна G.O.C. Раньше этого времени отряд не прибывает ни при каких ролах.")]
+        public float GocWaveStartMinuteThreshold { get; set; } = 15f;
+
+        [Description("Шанс (0..1) того, что очередная MTF-волна после GocWaveStartMinuteThreshold перехватится как G.O.C.-волна. Игроки заспавнятся в MTF-точке, но будут ролью Tutorial и отрядом G.O.C.")]
+        public float GocWaveChance { get; set; } = 0.35f;
+
+        [Description("Разрешать только ОДНУ G.O.C.-волну за раунд. Остальные MTF-волны после неё будут обычными. false — каждая MTF-волна перехватывается по собственному роллу.")]
+        public bool GocOneWavePerRound { get; set; } = true;
+
+        [Description("Сколько оперативников брать из спектаторов, если команда `goc wave` вызвана, когда живых MTF нет. 0 = ВСЕ спектаторы (рекомендуется), N = максимум N. Спавнятся в MTF-точке.")]
+        public int GocManualWaveSize { get; set; } = 0;
+
+        [Description("CASSIE-phonemes для объявления прибытия G.O.C.. Пустое значение — используется встроенный текст. CASSIE говорит английскими фонемами — русский перевод идёт отдельными субтитрами.")]
+        public string GocCassiePhonemes { get; set; } = string.Empty;
+
+        [Description("Русские субтитры к CASSIE-объявлению о прибытии G.O.C.. Пустое значение — используется встроенный текст (в нём упоминаются хакерские атаки и неопознанная враждебная группировка).")]
+        public string GocCassieSubtitles { get; set; } = string.Empty;
+
+        // ── FermixSquadClasses (кастомные классы внутри отрядов) ────
+
+        [Description("Включить кастомные классы для отрядов NTF и Chaos (Командир/Медик/Джаггернаут/Стрелок-Подрывник). G.O.C.-ранги тоже получают пассивки через эту систему.")]
+        public bool SquadClassesEnabled { get; set; } = true;
+
+        [Description("Радиус хил-ауры Медика в метрах. Союзники в этом радиусе с не-полным HP получают регенерацию каждый интервал.")]
+        public float SquadClassesMedicRadius { get; set; } = 6f;
+
+        [Description("Сколько HP за тик восстанавливает Медик союзникам в радиусе. 0 — пассивка отключена. Дефолт 2 HP — портировано из sosal-плагина (MTFMedic.HealAmount).")]
+        public float SquadClassesMedicHealPerSec { get; set; } = 2f;
+
+        [Description("Интервал между тиками хил-корутины Медика (секунды). Дефолт 1.0с — портировано из sosal-плагина (MTFMedic.HealInterval).")]
+        public float SquadClassesMedicHealInterval { get; set; } = 1f;
+
+        [Description("Множитель ИСХОДЯЩЕГО урона для Командира. 1.20 = +20% урона по всем целям.")]
+        public float SquadClassesCommanderDamageMult { get; set; } = 1.20f;
+
+        // ── FermixNvg (Night Vision Goggles) ─────────────────────────
+
+        [Description("Включить кастомный предмет «Прибор ночного видения» (адаптация MS-crew/NightVisionGoggles). Базируется на SCP-1344, активируется штатным биндом использования предмета.")]
+        public bool NvgEnabled { get; set; } = true;
+
+        [Description("Сколько NVG-предметов спавнить в комплексе при старте раунда (0..8).")]
+        public int NvgSpawnCount { get; set; } = 2;
+
+        [Description("Задержка перед авто-спавном NVG-предметов в секундах от старта раунда.")]
+        public float NvgSpawnDelay { get; set; } = 5f;
+
+        [Description("Снимать ли стандартный «слепящий» эффект SCP-1344 при надевании NVG (true — как в оригинальном плагине).")]
+        public bool NvgRemove1344Effect { get; set; } = true;
+
+        [Description("Интенсивность эффекта ночного видения 1..255. Дефолт 1.")]
+        public int NvgEffectIntensity { get; set; } = 1;
+
+        [Description("Дальность фонаря NVG (метры). Дефолт 50 — порт оригинала.")]
+        public float NvgLightRange { get; set; } = 50f;
+
+        [Description("Интенсивность фонаря NVG. Дефолт 4 (оригинал был 70 — слишком ярко в SCP:SL движке, ужал).")]
+        public float NvgLightIntensity { get; set; } = 4f;
+
+        [Description("Угол прожектора NVG. Дефолт 90.")]
+        public float NvgLightSpotAngle { get; set; } = 90f;
+
+        [Description("Внутренний угол прожектора NVG. Дефолт 0.")]
+        public float NvgLightInnerAngle { get; set; } = 0f;
+
+        [Description("Заставлять ли прожектор NVG отслеживать поворот камеры игрока (рекомендуется true).")]
+        public bool NvgTrackCamera { get; set; } = true;
+
+        [Description("Интервал апдейта поворота прожектора NVG за камерой в секундах. Дефолт 0.1.")]
+        public float NvgTrackInterval { get; set; } = 0.1f;
+
+        // ── FermixInfinity (бесконечные припасы / радио) ────────────
+
+        [Description("Включить FermixInfinity: рация без разряда, авто-докид магазина при перезарядке, запрет дропа/подбора патронов, очистка патронов при наручниках. Портировано из Hazbin.NoRules.InfinityStuff.")]
+        public bool InfinityStuffEnabled { get; set; } = true;
+
+        // ── FermixHitmarkers ────────────────────────────────────────
+
+        [Description("Включить хит-маркеры: при попадании по игроку показывать атакующему урон, при убийстве — пометку «Убит». Использует FermixHintStack (id-based).")]
+        public bool HitmarkersEnabled { get; set; } = true;
+
+        // ── FermixPlayerXp ──────────────────────────────────────────
+
+        [Description("Включить систему опыта/уровней (FermixPlayerXp). Сами уровни и стоимости настраиваются ОТДЕЛЬНЫМ конфигом FermixAPI/levels.yml.")]
+        public bool PlayerXpEnabled { get; set; } = true;
+
+        // ── FermixScpSwap ───────────────────────────────────────────
+
+        [Description("Включить .swap <SCP> для смены SCP-роли в первые секунды раунда. Портировано из Hazbin.NoRules.ScpSwap.")]
+        public bool ScpSwapEnabled { get; set; } = true;
+
+        [Description("Окно (в секундах) с начала раунда, в течение которого можно использовать .swap. По умолчанию 90с — как в Hazbin.")]
+        public float ScpSwapWindowSeconds { get; set; } = 90f;
+
+        // ── FermixServerHud (главный HUD сервера) ───────────────────
+        //
+        // Серверный HUD: «шапка» с названием сервера, индикатор раунда/TPS,
+        // карточка игрока (ник/роль/уровень), список живых SCP с их HP,
+        // индикатор SCP-чата при разговоре, и таймер ближайшей волны со
+        // случайной подсказкой для зрителей. Портировано из Hazbin.NoRules.Hud
+        // под архитектуру FermixAPI: каждая надпись — отдельный HsmHint в
+        // выделенной группе PlayerDisplay (FermixAPI.ServerHud), чтобы не
+        // конфликтовать с центральным FermixHintStack.
+
+        [Description("Включить серверный HUD (название сервера + статус игрока + волны/SCP).")]
+        public bool ServerHudEnabled { get; set; } = true;
+
+        [Description("Название сервера в шапке HUD'а. Поддерживает rich-text (<color=...>, <b>, <i>, <size=...>). По умолчанию — градиент NezerHill NoRules.")]
+        public string ServerHudServerName { get; set; } =
+            "<color=#FF3B3B>N</color><color=#FA4135>e</color><color=#F5472F>z</color><color=#F04C29>e</color>" +
+            "<color=#EB5223>r</color><color=#E6571D>H</color><color=#E15D17>i</color><color=#DC6311>l</color><color=#D7680B>l</color>" +
+            " <size=22><color=#FF8C00>NoRules</color></size>";
+
+        [Description("Как часто (секунды) меняется случайная подсказка в окне ожидания волны для зрителей.")]
+        public float ServerHudInfoRotationInterval { get; set; } = 8f;
+
+        [Description("Показывать в карточке игрока его уровень из FermixPlayerXp (если PlayerXpEnabled=false — будет писать «Неизвестно»).")]
+        public bool ServerHudShowPlayerLevel { get; set; } = true;
+
+        [Description("Показывать список живых SCP и их текущий HP на правой стороне экрана.")]
+        public bool ServerHudShowScpHpList { get; set; } = true;
+
+        [Description("Показывать ли таймер ближайшей волны мертвым/зрителям (МОГ + Хаос + подкрепления). При false таймер скрыт.")]
+        public bool ServerHudShowWaveTimers { get; set; } = true;
+
+        [Description("Список случайных подсказок для зрителей — выводится по очереди раз в ServerHudInfoRotationInterval секунд под таймером волн.")]
+        public System.Collections.Generic.List<string> ServerHudSpectatorInfo { get; set; } =
+            new System.Collections.Generic.List<string>
+            {
+                "Добро пожаловать на NezerHill NoRules!",
+                "В нашем дискорде проходит набор в администрацию!",
+                "Используй .help в консоли для списка команд.",
+                "Подкинь монетку (.coin) — может выпасть оружие или эффект.",
+                "Команда .vote yes/no — голосование от админов через .cv.",
+                "Если зашёл за SCP — у каждого свой набор уникальных биндов.",
+                "Суицид не выход!",
+            };
     }
 }
